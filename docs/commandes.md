@@ -11,6 +11,7 @@ docker compose up -d
 ```bash
 docker compose ps
 docker compose logs -f
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ```
 
 ## Tester MQTT
@@ -31,6 +32,38 @@ docker compose exec mosquitto mosquitto_pub -h localhost -t lab/test -m "hello i
 
 ```text
 http://localhost:1880
+```
+
+## Verifier OPC UA
+
+Endpoint depuis Node-RED :
+
+```text
+opc.tcp://opcplc:50000
+```
+
+Endpoint depuis la machine hote :
+
+```text
+opc.tcp://localhost:50000
+```
+
+NodeId de depart pour parcourir les objets :
+
+```text
+ns=0;i=85
+```
+
+Variable simulee utile :
+
+```text
+ns=3;s=StepUp
+```
+
+## Tester la publication OPC UA vers MQTT
+
+```bash
+docker compose exec mosquitto mosquitto_sub -h localhost -t industrie/opcua/stepup -C 5
 ```
 
 ## Arreter

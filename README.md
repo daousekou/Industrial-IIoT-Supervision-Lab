@@ -9,7 +9,9 @@ Ce depot est volontairement generique. Il ne contient aucun secret, aucun chemin
 - Lancer un laboratoire local avec Docker Compose.
 - Utiliser Node-RED comme outil d'automatisation visuelle.
 - Ajouter un broker MQTT Mosquitto.
-- Preparer une base OPC UA pour les tests industriels.
+- Ajouter un simulateur OPC UA local.
+- Lire une variable simulee dans Node-RED.
+- Publier les mesures OPC UA vers MQTT.
 - Documenter les ports, tests et avertissements de securite.
 
 ## Architecture
@@ -35,6 +37,7 @@ Ce depot est volontairement generique. Il ne contient aucun secret, aucun chemin
 | --- | --- | --- |
 | Node-RED | `1880` | Automatisation visuelle |
 | Mosquitto MQTT | `1883` | Broker MQTT local |
+| OPC PLC Simulator | `50000` | Serveur OPC UA simule |
 
 Les ports sont exposes sur `localhost` pour un laboratoire local. Ne pas exposer ces services directement sur Internet.
 
@@ -72,11 +75,73 @@ docker compose exec mosquitto mosquitto_pub -h localhost -t lab/test -m "hello i
 
 ## OPC UA
 
-Ce depot garde OPC UA comme axe documente de laboratoire, sans publier d'adresse industrielle reelle. Pour des tests futurs, utiliser un simulateur OPC UA local et des endpoints generiques comme :
+Le laboratoire utilise un simulateur OPC UA local. Dans le reseau Docker, Node-RED peut le joindre avec :
 
 ```text
-opc.tcp://localhost:4840
+opc.tcp://opcplc:50000
 ```
+
+Depuis la machine hote, le port est limite a l'interface locale :
+
+```text
+opc.tcp://localhost:50000
+```
+
+Exemples de NodeId utiles avec le simulateur :
+
+```text
+ObjectsFolder : ns=0;i=85
+OpcPlc        : ns=3;s=OpcPlc
+Telemetry     : ns=3;s=Telemetry
+Basic         : ns=3;s=Basic
+StepUp        : ns=3;s=StepUp
+```
+
+Le dossier `Objects` (`ns=0;i=85`) sert a parcourir les objets applicatifs. Le dossier `Types` (`ns=0;i=86`) contient surtout les types standards OPC UA.
+
+## Flow Node-RED attendu
+
+```text
+Inject (1 seconde)
+        |
+        v
+    OpcUa-Item
+        |
+        v
+  OpcUa-Client
+        |
+        +--------> Debug
+        |
+        +--------> MQTT Out
+                       |
+                       v
+                    Mosquitto
+```
+
+Parametres generiques :
+
+- OPC UA endpoint : `opc.tcp://opcplc:50000`
+- Security Mode : `SignAndEncrypt`
+- Security Policy : `Basic256Sha256`
+- Identite : `Anonymous`
+- Variable : `ns=3;s=StepUp`
+- Type : `UInt32`
+- Topic MQTT : `industrie/opcua/stepup`
+- QoS : `0`
+- Retain : `false`
+
+Verification MQTT :
+
+```bash
+docker compose exec mosquitto mosquitto_sub -h localhost -t industrie/opcua/stepup -C 5
+```
+
+## Problemes courants
+
+- MQTT reste en connexion : verifier que le broker utilise le port `1883`, pas `1888`.
+- OPC UA ne se connecte pas : verifier que l'endpoint utilise le nom Docker `opcplc`.
+- Le Browser OPC UA liste seulement des types : partir de `ns=0;i=85`, pas `ns=0;i=86`.
+- MQTT recoit `undefined` : relier MQTT a la sortie du noeud OPC UA qui contient vraiment la valeur lue.
 
 ## Arret
 
