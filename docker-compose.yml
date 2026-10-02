@@ -1,31 +1,20 @@
 services:
-  nodered:
-    image: nodered/node-red:latest
-    container_name: industrial_lab_nodered
-    ports:
-      - "127.0.0.1:1880:1880"
-    volumes:
-      - nodered_data:/data
-    restart: unless-stopped
-    networks:
-      - industrial-net
 
   mosquitto:
-    image: eclipse-mosquitto:2
-    container_name: industrial_lab_mosquitto
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
     ports:
       - "127.0.0.1:1883:1883"
     volumes:
-      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/config:/mosquitto/config
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
-    restart: unless-stopped
     networks:
       - industrial-net
 
   opcplc:
     image: mcr.microsoft.com/iotedge/opc-plc:latest
-    container_name: industrial_lab_opcplc
+    container_name: opcplc
     hostname: opcplc
     ports:
       - "127.0.0.1:50000:50000"
@@ -41,15 +30,74 @@ services:
       - "--fr=1"
       - "--ft=uint"
       - "--gn=5"
-    restart: unless-stopped
     networks:
       - industrial-net
 
-volumes:
-  nodered_data:
-  mosquitto_data:
-  mosquitto_log:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    ports:
+      - "127.0.0.1:1880:1880"
+    volumes:
+      - node_red_data:/data
+    networks:
+      - industrial-net
+    depends_on:
+      - mosquitto
+      - opcplc
+      - influxdb3
+      - timescaledb
+
+  influxdb3:
+    image: influxdb:3-core
+    container_name: influxdb3
+    ports:
+      - "127.0.0.1:8181:8181"
+    volumes:
+      - influxdb3_data:/var/lib/influxdb3/data
+    command:
+      - "influxdb3"
+      - "serve"
+      - "--node-id=loq-node"
+      - "--object-store=file"
+      - "--data-dir=/var/lib/influxdb3/data"
+    networks:
+      - industrial-net
+
+  timescaledb:
+    image: timescale/timescaledb:2.30.1-pg17
+    container_name: timescaledb
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${TIMESCALE_PASSWORD}
+      POSTGRES_DB: industrial_lab
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    networks:
+      - industrial-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_storage:/var/lib/grafana
+    networks:
+      - industrial-net
+    depends_on:
+      - influxdb3
+      - timescaledb
 
 networks:
   industrial-net:
     name: industrial-net
+
+volumes:
+  node_red_data:
+  mosquitto_data:
+  mosquitto_log:
+  influxdb3_data:
+  timescaledb_data:
+  grafana_storage:
