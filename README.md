@@ -36,7 +36,7 @@ L'acquisition est effectuée environ toutes les **2 secondes**, soit une fréque
 
 ---
 
-📘 **[Consulter la documentation technique complète](docs/Industrial-IIoT-Supervision-Lab.pdf)**
+ **[Consulter la documentation technique complète](docs/Industrial-IIoT-Supervision-Lab.pdf)**
 
 
 ## Dashboard de supervision
