@@ -1,0 +1,403 @@
+[
+    {
+        "id": "574d042ab3149135",
+        "type": "tab",
+        "label": "Labo_NEW",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "1d106f6b4e5eeeed",
+        "type": "OpcUa-Client",
+        "z": "574d042ab3149135",
+        "endpoint": "15d0784deb93decc",
+        "action": "read",
+        "deadbandtype": "a",
+        "deadbandvalue": 1,
+        "time": 10,
+        "timeUnit": "s",
+        "certificate": "n",
+        "localfile": "",
+        "localkeyfile": "",
+        "securitymode": "None",
+        "securitypolicy": "None",
+        "useTransport": false,
+        "maxChunkCount": 1,
+        "maxMessageSize": 8192,
+        "receiveBufferSize": 8192,
+        "sendBufferSize": 8192,
+        "setstatusandtime": false,
+        "keepsessionalive": false,
+        "name": "",
+        "applicationName": "",
+        "applicationUri": "",
+        "x": 540,
+        "y": 240,
+        "wires": [
+            [
+                "5a488a9bf0fd92f3",
+                "295e1c4a62f2d84d",
+                "50262ff10f6af327",
+                "7fcafc8487986ab9"
+            ],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "a194a33623d007f6",
+        "type": "OpcUa-Item",
+        "z": "574d042ab3149135",
+        "item": "ns=3;s=StepUp",
+        "datatype": "UInt32",
+        "value": "",
+        "name": "",
+        "x": 340,
+        "y": 260,
+        "wires": [
+            [
+                "1d106f6b4e5eeeed"
+            ]
+        ]
+    },
+    {
+        "id": "20c970c9d0706d00",
+        "type": "inject",
+        "z": "574d042ab3149135",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "2",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 120,
+        "y": 320,
+        "wires": [
+            [
+                "a194a33623d007f6",
+                "4d748f9515c462ab"
+            ]
+        ]
+    },
+    {
+        "id": "5a488a9bf0fd92f3",
+        "type": "debug",
+        "z": "574d042ab3149135",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 840,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "f839affb57cc5057",
+        "type": "mqtt out",
+        "z": "574d042ab3149135",
+        "name": "Publication StepUp",
+        "topic": "",
+        "qos": "0",
+        "retain": "false",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "bc87c15be2f63980",
+        "x": 1110,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "4d2957dc968a2073",
+        "type": "influxdb3-write",
+        "z": "574d042ab3149135",
+        "influxdb": "ab58c35f612a1f46",
+        "name": "Enregistrement InfluxDB",
+        "measurement": "opcua",
+        "database": "",
+        "allowPartialWrites": false,
+        "noSync": false,
+        "x": 1110,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "295e1c4a62f2d84d",
+        "type": "function",
+        "z": "574d042ab3149135",
+        "name": "Formatage OPC UA InfluxDB",
+        "func": "const valeur = Number(msg.payload);\n\nif (!Number.isFinite(valeur)) {\n    node.warn(\"Valeur OPC UA invalide\");\n    return null;\n}\n\n// Récupère automatiquement le nom de la variable depuis le NodeId\n// Exemple : ns=3;s=StepUp -> StepUp\nconst variable = String(msg.topic || \"\").split(\";s=\")[1] || \"unknown\";\n\n// Timestamp réel fourni par OPC UA\nmsg.timestamp = new Date(msg.sourceTimestamp);\n\nmsg.payload = {\n    fields: {\n        value: valeur\n    },\n    tags: {\n        machine: \"opcplc\",\n        variable: variable\n    }\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 820,
+        "y": 260,
+        "wires": [
+            [
+                "b1216511ca5ac953",
+                "4d2957dc968a2073"
+            ]
+        ]
+    },
+    {
+        "id": "b1216511ca5ac953",
+        "type": "debug",
+        "z": "574d042ab3149135",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1100,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "594b0ac142ade141",
+        "type": "postgresql",
+        "z": "574d042ab3149135",
+        "name": "",
+        "query": "SELECT 1 AS test;",
+        "postgreSQLConfig": "36e661ec02bfd3c0",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 350,
+        "y": 420,
+        "wires": [
+            [
+                "bee758db54352346"
+            ]
+        ]
+    },
+    {
+        "id": "bee758db54352346",
+        "type": "debug",
+        "z": "574d042ab3149135",
+        "name": "debug 4",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "9d7e97de36734840",
+        "type": "inject",
+        "z": "574d042ab3149135",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 400,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "50262ff10f6af327",
+        "type": "function",
+        "z": "574d042ab3149135",
+        "name": "Formatage OPC UA TimescaleDB",
+        "func": "const valeur = Number(msg.payload);\n\nif (!Number.isFinite(valeur)) {\n    node.warn(\"Valeur OPC UA invalide\");\n    return null;\n}\n\n// Exemple : ns=3;s=StepUp -> StepUp\nconst variable = String(msg.topic || \"\").split(\";s=\")[1] || \"unknown\";\n\n// On utilise le timestamp OPC UA réel\nconst horodatage = new Date(msg.sourceTimestamp).toISOString();\n\nmsg.params = [\n    horodatage,\n    \"opcplc\",\n    variable,\n    valeur\n];\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 820,
+        "y": 340,
+        "wires": [
+            [
+                "24f090c476909d93"
+            ]
+        ]
+    },
+    {
+        "id": "24f090c476909d93",
+        "type": "postgresql",
+        "z": "574d042ab3149135",
+        "name": "Enregistrement TimescaleDB",
+        "query": "\nINSERT INTO mesures_opcua\n    (time, machine, variable, value)\nVALUES\n    ($1, $2, $3, $4);\n",
+        "postgreSQLConfig": "36e661ec02bfd3c0",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 1160,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "4d748f9515c462ab",
+        "type": "OpcUa-Item",
+        "z": "574d042ab3149135",
+        "item": "ns=3;s=RandomSignedInt32",
+        "datatype": "Int32",
+        "value": "",
+        "name": "",
+        "x": 340,
+        "y": 320,
+        "wires": [
+            [
+                "1d106f6b4e5eeeed"
+            ]
+        ]
+    },
+    {
+        "id": "7fcafc8487986ab9",
+        "type": "function",
+        "z": "574d042ab3149135",
+        "name": "Routage MQTT OPC UA",
+        "func": "const variable = String(msg.topic || \"\").split(\";s=\")[1] || \"unknown\";\n\nmsg.topic = `industrie/opcua/${variable}`;\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 180,
+        "wires": [
+            [
+                "f839affb57cc5057"
+            ]
+        ]
+    },
+    {
+        "id": "15d0784deb93decc",
+        "type": "OpcUa-Endpoint",
+        "name": "Opcua",
+        "endpoint": "opc.tcp://opcplc:50000",
+        "secpol": "Basic256Sha256",
+        "secmode": "SignAndEncrypt",
+        "none": true,
+        "login": false,
+        "usercert": false,
+        "usercertificate": "",
+        "userprivatekey": ""
+    },
+    {
+        "id": "bc87c15be2f63980",
+        "type": "mqtt-broker",
+        "name": "Mosquitto Industrial",
+        "broker": "mosquitto",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ab58c35f612a1f46",
+        "type": "influxdb3-config",
+        "name": "InfluxDB3 Industrial",
+        "host": "http://influxdb3:8181",
+        "database": "industrial_lab",
+        "tlsRejectUnauthorized": true,
+        "caCertPath": ""
+    },
+    {
+        "id": "36e661ec02bfd3c0",
+        "type": "postgreSQLConfig",
+        "name": "TimescaleDB Industrial",
+        "host": "timescaledb",
+        "hostFieldType": "str",
+        "port": 5432,
+        "portFieldType": "num",
+        "database": "industrial_lab",
+        "databaseFieldType": "str",
+        "ssl": "false",
+        "sslFieldType": "bool",
+        "applicationName": "",
+        "applicationNameType": "str",
+        "max": 10,
+        "maxFieldType": "num",
+        "idle": 1000,
+        "idleFieldType": "num",
+        "connectionTimeout": 10000,
+        "connectionTimeoutFieldType": "num",
+        "userFieldType": "cred",
+        "userEnv": "",
+        "passwordFieldType": "cred",
+        "passwordEnv": ""
+    },
+    {
+        "id": "9cbdf4dbc30629f9",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-opcua": "0.2.355",
+            "node-red-contrib-influxdb3": "1.1.1",
+            "node-red-contrib-postgresql": "0.16.2"
+        }
+    }
+]
