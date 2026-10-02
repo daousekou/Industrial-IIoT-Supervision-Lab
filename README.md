@@ -1,167 +1,454 @@
-# Laboratoire industriel Docker
+# Industrial IIoT Supervision Lab
 
-Projet de laboratoire pour documenter un environnement industriel local avec Docker, Node-RED, OPC UA et MQTT.
+> Laboratoire industriel local reproduisant une chaîne complète d'acquisition, de communication, d'historisation et de supervision de données avec **OPC UA, Node-RED, MQTT, InfluxDB 3, TimescaleDB, Grafana et Docker Compose**.
 
-Ce depot est volontairement generique. Il ne contient aucun secret, aucun chemin local personnel, aucun identifiant et aucune information liee a une entreprise.
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Node-RED](https://img.shields.io/badge/Node--RED-Industrial%20Flows-8F0000?logo=nodered&logoColor=white)
+![MQTT](https://img.shields.io/badge/MQTT-Mosquitto-660066?logo=eclipsemosquitto&logoColor=white)
+![OPC UA](https://img.shields.io/badge/OPC%20UA-Industrial%20Communication-005B96)
+![InfluxDB](https://img.shields.io/badge/InfluxDB-3-22ADF6?logo=influxdb&logoColor=white)
+![TimescaleDB](https://img.shields.io/badge/TimescaleDB-PostgreSQL-336791?logo=postgresql&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-Supervision-F46800?logo=grafana&logoColor=white)
 
-## Objectifs
+---
 
-- Lancer un laboratoire local avec Docker Compose.
-- Utiliser Node-RED comme outil d'automatisation visuelle.
-- Ajouter un broker MQTT Mosquitto.
-- Ajouter un simulateur OPC UA local.
-- Lire une variable simulee dans Node-RED.
-- Publier les mesures OPC UA vers MQTT.
-- Documenter les ports, tests et avertissements de securite.
+## Aperçu
+
+Ce projet met en place un environnement **IIoT / informatique industrielle** entièrement local permettant de simuler une installation industrielle et de suivre les données depuis leur acquisition OPC UA jusqu'à leur visualisation dans Grafana.
+
+Le laboratoire comprend **6 services Docker** :
+
+- OPC PLC Simulator
+- Node-RED
+- Eclipse Mosquitto
+- InfluxDB 3
+- TimescaleDB / PostgreSQL
+- Grafana
+
+Deux variables OPC UA sont actuellement exploitées :
+
+| Variable | NodeId | Type |
+|---|---|---|
+| `StepUp` | `ns=3;s=StepUp` | UInt32 |
+| `RandomSignedInt32` | `ns=3;s=RandomSignedInt32` | Int32 |
+
+L'acquisition est effectuée environ toutes les **2 secondes**, soit une fréquence proche de **0,5 Hz**.
+
+---
+
+## Dashboard de supervision
+
+Le dashboard Grafana regroupe l'état du système, la fraîcheur des données, les valeurs instantanées et les historiques provenant des deux bases de données.
+
+![Dashboard Grafana](docs/images/grafana_supervision_v1.png)
+
+Il permet notamment de visualiser :
+
+- l'état global du laboratoire ;
+- l'état de l'acquisition ;
+- l'âge de la dernière mesure ;
+- la fréquence d'acquisition ;
+- le nombre de mesures reçues sur une minute ;
+- la valeur instantanée de `StepUp` ;
+- la valeur instantanée de `RandomSignedInt32` ;
+- les historiques InfluxDB 3 et TimescaleDB.
+
+---
 
 ## Architecture
 
 ```text
-.
-|-- README.md
-|-- docker-compose.yml
-|-- docs/
-|   |-- commandes.md
-|   |-- securite.md
-|   `-- tests-realises.md
-|-- mosquitto/
-|   `-- config/
-|       `-- mosquitto.conf
-`-- nodered/
-    `-- README.md
+                    ┌──────────────────────┐
+                    │  OPC PLC Simulator   │
+                    │     OPC UA Server    │
+                    │       :50000         │
+                    └──────────┬───────────┘
+                               │
+                            OPC UA
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │       Node-RED       │
+                    │ Acquisition / Routage│
+                    │        :1880         │
+                    └──────┬────┬────┬─────┘
+                           │    │    │
+                 MQTT      │    │    │ SQL / TS
+                           │    │    │
+                           ▼    ▼    ▼
+                    ┌─────────┐ ┌───────────┐
+                    │Mosquitto│ │ InfluxDB3 │
+                    │  :1883  │ │   :8181   │
+                    └─────────┘ └─────┬─────┘
+                                      │
+                           ┌──────────┴──────────┐
+                           │                     │
+                           ▼                     ▼
+                    ┌────────────┐        ┌────────────┐
+                    │TimescaleDB │        │   Grafana  │
+                    │   :5432    │───────▶│   :3000   │
+                    └────────────┘        └────────────┘
 ```
 
-## Services
+Node-RED joue le rôle de couche d'intégration entre le monde **OT** et les services de données.
 
-| Service | Port local | Role |
-| --- | --- | --- |
-| Node-RED | `1880` | Automatisation visuelle |
-| Mosquitto MQTT | `1883` | Broker MQTT local |
-| OPC PLC Simulator | `50000` | Serveur OPC UA simule |
+---
 
-Les ports sont exposes sur `localhost` pour un laboratoire local. Ne pas exposer ces services directement sur Internet.
+## Flow Node-RED
 
-## Demarrage
+Le même client OPC UA traite actuellement `StepUp` et `RandomSignedInt32`.
+
+Les données sont ensuite dirigées vers trois branches :
+
+1. publication MQTT ;
+2. historisation InfluxDB 3 ;
+3. historisation TimescaleDB.
+
+![Flow Node-RED](docs/images/nodered_flow_multivariable.png)
+
+Le flow exporté est disponible ici :
+
+[`nodered/flows.json`](nodered/flows.json)
+
+### Routage MQTT
+
+Les topics sont générés dynamiquement :
+
+```text
+industrie/opcua/StepUp
+industrie/opcua/RandomSignedInt32
+```
+
+Cela permet de conserver une séparation claire entre les différentes variables industrielles.
+
+---
+
+## Historisation des données
+
+### InfluxDB 3
+
+Les valeurs OPC UA sont enregistrées dans la base :
+
+```text
+industrial_lab
+```
+
+avec une measurement générique :
+
+```text
+opcua
+```
+
+Les variables sont différenciées grâce au tag `variable`.
+
+### TimescaleDB
+
+TimescaleDB repose sur PostgreSQL et utilise une hypertable :
+
+```sql
+mesures_opcua
+```
+
+Structure :
+
+```sql
+CREATE TABLE IF NOT EXISTS mesures_opcua (
+    time TIMESTAMPTZ NOT NULL,
+    machine TEXT NOT NULL,
+    variable TEXT NOT NULL,
+    value DOUBLE PRECISION NOT NULL
+);
+```
+
+Le script complet est disponible dans :
+
+[`timescaledb/schema.sql`](timescaledb/schema.sql)
+
+---
+
+## Comparaison InfluxDB 3 / TimescaleDB
+
+Une partie du projet consiste également à comparer les deux solutions d'historisation sur les mêmes données OPC UA.
+
+![Comparaison InfluxDB TimescaleDB](docs/images/grafana_comparaison.png)
+
+Les deux bases reçoivent les mêmes variables avec des timestamps issus de la source OPC UA.
+
+Cela permet de comparer :
+
+- une base dédiée aux séries temporelles : **InfluxDB 3** ;
+- une extension temporelle de PostgreSQL : **TimescaleDB**.
+
+---
+
+## Docker Compose
+
+L'ensemble du laboratoire est orchestré avec Docker Compose.
+
+![Docker Desktop](docs/images/docker_desktop_compose.png)
+
+Les six services sont regroupés dans :
+
+[`docker-compose.yml`](docker-compose.yml)
+
+Vérification depuis le terminal :
+
+![docker compose ps](docs/images/docker_compose_ps.png)
+
+---
+
+## Ports
+
+Tous les ports publiés sont limités à l'interface locale `127.0.0.1`.
+
+| Service | Port | Fonction |
+|---|---:|---|
+| Grafana | `3000` | Supervision |
+| TimescaleDB | `5432` | Historisation SQL temporelle |
+| InfluxDB 3 | `8181` | Base de séries temporelles |
+| Node-RED | `1880` | Acquisition et intégration |
+| Mosquitto | `1883` | Broker MQTT |
+| OPC PLC | `50000` | Serveur OPC UA simulé |
+
+---
+
+## Démarrage rapide
+
+### 1. Cloner le dépôt
+
+```bash
+git clone https://github.com/daousekou/Industrial-IIoT-Supervision-Lab.git
+cd Industrial-IIoT-Supervision-Lab
+```
+
+### 2. Créer le fichier d'environnement
+
+```bash
+cp .env.example .env
+```
+
+Puis définir son propre mot de passe TimescaleDB :
+
+```env
+TIMESCALE_PASSWORD=your_password_here
+```
+
+Le vrai fichier `.env` ne doit jamais être publié.
+
+### 3. Démarrer les services
 
 ```bash
 docker compose up -d
 ```
 
-Verifier les conteneurs :
+ou :
+
+```bash
+./scripts/start_lab.sh
+```
+
+### 4. Vérifier les conteneurs
 
 ```bash
 docker compose ps
 ```
 
-Ouvrir Node-RED :
+### 5. Initialiser TimescaleDB
+
+```bash
+docker compose exec -T timescaledb \
+  psql -U postgres -d industrial_lab < timescaledb/schema.sql
+```
+
+### 6. Configurer Node-RED
+
+Ouvrir :
 
 ```text
 http://localhost:1880
 ```
 
-## Tests rapides MQTT
+Installer les modules nécessaires depuis **Manage palette** :
 
-Terminal 1 :
-
-```bash
-docker compose exec mosquitto mosquitto_sub -h localhost -t lab/test
+```text
+node-red-contrib-opcua
+node-red-contrib-influxdb3
+node-red-contrib-postgresql
 ```
 
-Terminal 2 :
+Puis importer :
 
-```bash
-docker compose exec mosquitto mosquitto_pub -h localhost -t lab/test -m "hello industrial lab"
+```text
+nodered/flows.json
 ```
 
-## OPC UA
+### 7. Accéder à Grafana
 
-Le laboratoire utilise un simulateur OPC UA local. Dans le reseau Docker, Node-RED peut le joindre avec :
+```text
+http://localhost:3000
+```
+
+L'export du dashboard utilisé dans le projet est disponible dans :
+
+[`grafana/`](grafana/)
+
+---
+
+## Configuration OPC UA
+
+Endpoint utilisé entre les conteneurs :
 
 ```text
 opc.tcp://opcplc:50000
 ```
 
-Depuis la machine hote, le port est limite a l'interface locale :
+Configuration de sécurité utilisée dans Node-RED :
 
 ```text
-opc.tcp://localhost:50000
+Security Policy : Basic256Sha256
+Security Mode   : SignAndEncrypt
 ```
 
-Exemples de NodeId utiles avec le simulateur :
+Le simulateur utilise `--autoaccept` pour simplifier les essais dans cet environnement de laboratoire.
+
+---
+
+## MQTT
+
+Mosquitto est utilisé comme broker local.
+
+Configuration actuelle :
 
 ```text
-ObjectsFolder : ns=0;i=85
-OpcPlc        : ns=3;s=OpcPlc
-Telemetry     : ns=3;s=Telemetry
-Basic         : ns=3;s=Basic
-StepUp        : ns=3;s=StepUp
+listener 1883
+allow_anonymous true
 ```
 
-Le dossier `Objects` (`ns=0;i=85`) sert a parcourir les objets applicatifs. Le dossier `Types` (`ns=0;i=86`) contient surtout les types standards OPC UA.
+Cette configuration est volontairement simplifiée pour un laboratoire isolé.
 
-## Flow Node-RED attendu
+En production, il faudrait notamment ajouter :
+
+- authentification ;
+- ACL ;
+- TLS ;
+- gestion des certificats.
+
+---
+
+## Validations réalisées
+
+Les principaux tests réalisés sur l'architecture :
+
+| Test | Résultat |
+|---|:---:|
+| Démarrage des 6 services Docker | ✅ |
+| Connexion OPC UA | ✅ |
+| Lecture `StepUp` | ✅ |
+| Lecture `RandomSignedInt32` | ✅ |
+| Acquisition cyclique ~0,5 Hz | ✅ |
+| Publication MQTT | ✅ |
+| Routage MQTT par variable | ✅ |
+| Historisation InfluxDB 3 | ✅ |
+| Historisation TimescaleDB | ✅ |
+| Cohérence des timestamps | ✅ |
+| Dashboard Grafana | ✅ |
+| Indicateurs de fraîcheur des données | ✅ |
+| Persistance des services | ✅ |
+| Ports limités à localhost | ✅ |
+
+---
+
+## Structure du dépôt
 
 ```text
-Inject (1 seconde)
-        |
-        v
-    OpcUa-Item
-        |
-        v
-  OpcUa-Client
-        |
-        +--------> Debug
-        |
-        +--------> MQTT Out
-                       |
-                       v
-                    Mosquitto
+Industrial-IIoT-Supervision-Lab/
+│
+├── docker-compose.yml
+├── .env.example
+├── .gitignore
+├── README.md
+│
+├── mosquitto/
+│   └── config/
+│       └── mosquitto.conf
+│
+├── nodered/
+│   ├── README.md
+│   └── flows.json
+│
+├── grafana/
+│   └── Industrial Lab - OPC UA _ TimescaleDB-....json
+│
+├── timescaledb/
+│   └── schema.sql
+│
+├── scripts/
+│   ├── start_lab.sh
+│   └── stop_lab.sh
+│
+└── docs/
+    ├── commandes.md
+    ├── securite.md
+    ├── tests-realises.md
+    │
+    └── images/
+        ├── grafana_supervision_v1.png
+        ├── grafana_comparaison.png
+        ├── nodered_flow_multivariable.png
+        ├── docker_desktop_compose.png
+        └── docker_compose_ps.png
 ```
 
-Parametres generiques :
+---
 
-- OPC UA endpoint : `opc.tcp://opcplc:50000`
-- Security Mode : `SignAndEncrypt`
-- Security Policy : `Basic256Sha256`
-- Identite : `Anonymous`
-- Variable : `ns=3;s=StepUp`
-- Type : `UInt32`
-- Topic MQTT : `industrie/opcua/stepup`
-- QoS : `0`
-- Retain : `false`
+## Sécurité
 
-Verification MQTT :
+Ce dépôt représente un **laboratoire d'apprentissage**, pas une architecture de production.
 
-```bash
-docker compose exec mosquitto mosquitto_sub -h localhost -t industrie/opcua/stepup -C 5
+Aucun secret réel ne doit être versionné.
+
+Le fichier `.gitignore` exclut notamment :
+
+```text
+.env
+*.env
+*.pem
+*.key
+*.crt
 ```
 
-## Problemes courants
+Les ports sont publiés uniquement sur :
 
-- MQTT reste en connexion : verifier que le broker utilise le port `1883`, pas `1888`.
-- OPC UA ne se connecte pas : verifier que l'endpoint utilise le nom Docker `opcplc`.
-- Le Browser OPC UA liste seulement des types : partir de `ns=0;i=85`, pas `ns=0;i=86`.
-- MQTT recoit `undefined` : relier MQTT a la sortie du noeud OPC UA qui contient vraiment la valeur lue.
-
-## Arret
-
-```bash
-docker compose down
+```text
+127.0.0.1
 ```
 
-## Securite
+Documentation complémentaire :
 
-Ne jamais publier :
+- [Sécurité](docs/securite.md)
+- [Commandes utiles](docs/commandes.md)
+- [Tests réalisés](docs/tests-realises.md)
 
-- mots de passe Node-RED ;
-- credentials MQTT ;
-- endpoints OPC UA internes ;
-- IP ou hostnames d'entreprise ;
-- fichiers de certificats prives ;
-- flows Node-RED contenant des secrets.
+---
 
-Voir [docs/securite.md](docs/securite.md).
+## Perspectives
 
-## Licence
+Les prochaines évolutions possibles du laboratoire incluent :
 
-Ce projet est fourni comme support d'apprentissage. Ajouter une licence explicite avant reutilisation publique dans un contexte professionnel.
+- alarmes et événements Grafana ;
+- authentification MQTT ;
+- gestion stricte des certificats OPC UA ;
+- ajout de nouvelles variables industrielles ;
+- KPI de production ;
+- analyse Python des historiques ;
+- détection d'anomalies ;
+- maintenance prédictive ;
+- intégration future avec ROS 2.
+
+---
+
+## Objectif du projet
+
+Ce laboratoire a été développé afin d'approfondir concrètement plusieurs compétences utilisées en **automatisme et informatique industrielle** :
+
+**OPC UA • MQTT • Node-RED • Docker • IIoT • PostgreSQL • TimescaleDB • InfluxDB • Grafana • supervision industrielle**
