@@ -89,6 +89,23 @@ services:
     depends_on:
       - influxdb3
       - timescaledb
+   
+     
+  pgadmin:
+    image: dpage/pgadmin4:9.18
+    container_name: pgadmin
+    ports:
+      - "127.0.0.1:5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - industrial-net
+    depends_on:
+      - timescaledb
+
 
 networks:
   industrial-net:
@@ -101,3 +118,4 @@ volumes:
   influxdb3_data:
   timescaledb_data:
   grafana_storage:
+  pgadmin_data:
