@@ -16,7 +16,7 @@
 
 Ce projet met en place un environnement **IIoT / informatique industrielle** entièrement local permettant de simuler une installation industrielle et de suivre les données depuis leur acquisition OPC UA jusqu'à leur visualisation dans Grafana.
 
-Le laboratoire comprend **6 services Docker** :
+Le laboratoire comprend **7 services Docker** :
 
 - OPC PLC Simulator
 - Node-RED
@@ -24,7 +24,8 @@ Le laboratoire comprend **6 services Docker** :
 - InfluxDB 3
 - TimescaleDB / PostgreSQL
 - Grafana
-
+- pgAdmin 4
+- 
 Deux variables OPC UA sont actuellement exploitées :
 
 | Variable | NodeId | Type |
@@ -212,6 +213,7 @@ Tous les ports publiés sont limités à l'interface locale `127.0.0.1`.
 | Node-RED | `1880` | Acquisition et intégration |
 | Mosquitto | `1883` | Broker MQTT |
 | OPC PLC | `50000` | Serveur OPC UA simulé |
+| pgAdmin 4 | `5050` | Administration PostgreSQL / TimescaleDB |
 
 ---
 
