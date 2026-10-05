@@ -25,7 +25,7 @@ Le laboratoire comprend **7 services Docker** :
 - TimescaleDB / PostgreSQL
 - Grafana
 - pgAdmin 4
-- 
+
 Deux variables OPC UA sont actuellement exploitées :
 
 | Variable | NodeId | Type |
@@ -61,38 +61,9 @@ Il permet notamment de visualiser :
 
 ## Architecture
 
-```text
-                    ┌──────────────────────┐
-                    │  OPC PLC Simulator   │
-                    │     OPC UA Server    │
-                    │       :50000         │
-                    └──────────┬───────────┘
-                               │
-                            OPC UA
-                               │
-                               ▼
-                    ┌──────────────────────┐
-                    │       Node-RED       │
-                    │ Acquisition / Routage│
-                    │        :1880         │
-                    └──────┬────┬────┬─────┘
-                           │    │    │
-                 MQTT      │    │    │ SQL / TS
-                           │    │    │
-                           ▼    ▼    ▼
-                    ┌─────────┐ ┌───────────┐
-                    │Mosquitto│ │ InfluxDB3 │
-                    │  :1883  │ │   :8181   │
-                    └─────────┘ └─────┬─────┘
-                                      │
-                           ┌──────────┴──────────┐
-                           │                     │
-                           ▼                     ▼
-                    ┌────────────┐        ┌────────────┐
-                    │TimescaleDB │        │   Grafana  │
-                    │   :5432    │───────▶│   :3000   │
-                    └────────────┘        └────────────┘
-```
+L'architecture repose sur un réseau Docker commun `industrial-net`, avec Node-RED comme couche d'intégration entre l'acquisition OPC UA, la messagerie MQTT, l'historisation et la supervision.
+
+![Architecture du laboratoire IIoT](docs/images/architecture_industrial_lab.png)
 
 Node-RED joue le rôle de couche d'intégration entre le monde **OT** et les services de données.
 
