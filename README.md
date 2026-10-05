@@ -162,7 +162,7 @@ L'ensemble du laboratoire est orchestré avec Docker Compose.
 
 ![Docker Desktop](docs/images/docker_desktop_compose.png)
 
-Les six services sont regroupés dans :
+Les sept services sont regroupés dans :
 
 [`docker-compose.yml`](docker-compose.yml)
 
