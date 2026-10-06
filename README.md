@@ -160,7 +160,7 @@ Cela permet de comparer :
 
 L'ensemble du laboratoire est orchestré avec Docker Compose.
 
-![Docker Desktop](docs/images/docker_desktop_compose.png)
+![Docker Desktop](docs/images/docker_compose_extrait.png)
 
 Les sept services sont regroupés dans :
 
